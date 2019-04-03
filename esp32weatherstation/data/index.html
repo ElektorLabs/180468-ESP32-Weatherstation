@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>ESP32</title>
+		<style>
+			html {
+				font-family: Verdana, Geneva, sans-serif
+			}
+
+			.content {
+				margin-left: 200px;
+				transition: 0.5s;
+				margin-top: 1.5em;
+			}
+
+			/*grid*/
+			.grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+			}
+			.grid > div:not(.grid) {
+				margin: 0em auto 3em;
+			}
+
+			/*menu styling*/
+			.menuOpenBtn {
+				position: absolute;
+				top: 20px;
+				left: 20px;
+				font-size: 20px;
+				color: #111;
+				transition: 0.3s;
+			}
+			.menuOpenBtn:hover {
+				color: #ff0000;
+			}
+			.menuLbl {
+				color: #f1f1f1;
+				padding-left: 20px;
+			}
+			.menu {
+				background-color: #111;
+				position: fixed;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: 200px;
+				transition: 0.5s;
+			}
+			.menu a {
+				padding: 8px 8px 8px 32px;
+				font-size: 20px;
+				color: #818181;
+				display: block;
+				transition: 0.3s;
+			}
+			.menu a:hover {
+				color: #f1f1f1;
+			}
+			.menu a.active {
+				background-color: #444;
+			}
+			.menu .menuCloseBtn {
+				display: none;
+				position: absolute;
+				top: 0;
+				right: 20px;
+				font-size: 36px;
+			}
+
+			/*respond to screen sizes*/
+			@media screen and (max-width: 1100px) {
+				.grid {
+					grid-template-columns: auto;
+				}
+			}
+			@media screen and (max-width: 600px) {
+				.content {
+					margin-left: 0px;
+				}
+				.menu {
+					left: -200px;
+				}
+				.menu.open {
+					left: 0px;
+				}
+				.menu .menuCloseBtn {
+					display: block;
+				}
+				.content {
+					margin-top: 70px;
+				}
+			}
+
+			/*other*/
+			a {
+				text-decoration: none;
+			}
+			table {
+				border-collapse: collapse;
+				border-radius: 1em;
+				overflow: hidden;
+				margin: 0px auto;
+			}
+			th, td {
+				padding: 0.5em;
+				background: #ddd;
+			}
+			td {
+				border-top: 2px solid white;
+			}
+			table.vertical > tbody > tr > td:first-child:not(.stdColor) {
+				background-color: #bbb;
+			}
+			th {
+				color: #fff;
+				background-color: #f00;
+			}
+			input, select{
+				padding: 0.5em;
+			}
+			.notification {
+				position: fixed;
+				left: 0;
+				bottom: 0;
+				width: 100%;
+				padding: 20px 0px;
+				text-align: center;
+				font-weight: bold;
+				color: #fff;
+				background-color: #f00;
+				border-top: 1px solid #111;
+				transform:scaleY(0);
+				transform-origin: bottom;
+				transition: 0.5s;
+			}
+			.notification.open {
+				transform:scaleY(1);
+			}
+		</style>
+	</head>
+	<body onload="pageLoad()">
+		<a href="javascript:openMenu()" class="menuOpenBtn">&#9776;</a>
+		<div id="menu" class="menu">
+			<a href="javascript:closeMenu()" class="menuCloseBtn">x</a>
+			<h1 class="menuLbl">Menu</h1>
+			<a class="menuBtn" id="weatherDataBtn" href="javascript:showWeatherData()">Weather data</a>
+			<a class="menuBtn" id="batteryDataBtn" href="javascript:showBatteryData()">Battery data</a>
+			<a class="menuBtn" id="WiFiSettingsBtn" href="javascript:showWiFiSettings()">WiFi settings</a>
+			<a class="menuBtn" id="uploadSettingsBtn" href="javascript:showUploadSettings()">Upload settings</a>
+            <a class="menuBtn" id="MQTTViewBtn" href="javascript:showMQTTPage()">MQTT settings</a>
+            <a class="menuBtn" id="NotesBtn" href="javascript:showNotes()">Notes</a>
+ <!--           <a class="menuBtn" id="HttpViewBtn" href="javascript:showWebserSettings()">Webserver</a> -->
+			<a class="menuBtn" id="restartBtn" href="javascript:restart()">Restart</a>
+		</div>
+		
+		<div class="content">
+			<div id="weatherData" class="views grid">
+				<div>
+					<table class="vertical">
+						<thead>
+							<tr>
+								<th colspan="2">Wind speed and direction</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td class="stdColor" colspan="2"><canvas id="windCanvas"></canvas></td>
+							</tr>
+							<tr>
+								<td>Beaufort</td><td id="windBeaufort">-</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<table class="vertical">
+						<thead>
+							<tr>
+								<th colspan="2">Temperature, humidity and airpressure</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Temperature</td><td id="temperature">-</td>
+							</tr>
+							<tr>
+								<td>Humidity</td><td id="humidity">-</td>
+							</tr>
+							<tr>
+								<td>Airpressure</td><td id="pressure">-</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<table class="vertical">
+						<thead>
+							<tr>
+								<th colspan="2">Dust</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>PM2.5</td><td id="PM25">-</td>
+							</tr>
+							<tr>
+								<td>PM10</td><td id="PM10">-</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+			<div id="batteryData" class="views">
+				<table>
+					<thead>
+						<tr>
+							<th colspan="2">Battery status</th>
+						<tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Current voltage</td><td id="currentVoltage">-</td>
+						</tr>
+						<tr>
+							<td>Charging</td><td><span id="chargingStatus">-</span><br><button id="toggleChargingBtn" onclick="toggleCharging()">Start charging</button></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+            
+             <div id="MQTTView" class="views grid">
+                 <table>
+						<thead>
+							<tr>
+								<th colspan="2">MQTT settings</th>
+							</tr>
+						</thead>
+                        
+						<tbody>
+							<tr>
+                            <td>
+            
+            
+                            <fieldset>
+                                        <legend>MQTT settings</legend>
+                                        <input type="checkbox" id="MQTT_ENA" name="MQTT_ENA" value="MQTT_ENA">Enable MQTT Client<br><br>
+                                        <input style="width:60px" type="number" id="MQTT_UPDATE_INT" name="MQTT_UPDATE_INT" min="0" max="65535" value="10"> Intervall<br><br>
+                                        MQTT Hostname <input type="text" id="MQTT_HOST" name="MQTT_HOST" value=""> <br><br> 
+                                        MQTT Server <input type="text" id="MQTT_SERVER" name="MQTT_SERVER" value="0.0.0.0"> 
+                                        <input style="width:60px" type="number" id="MQTT_PORT" name="ntp_update_delta" min="0" max="65535" value="1833"> Port <br><br>
+                                        MQTT Topic <input type="text" id="MQTT_TOPIC" name="MQTT_TOPIC" value=""> <br><br>                                       
+                                        MQTT User <input type="text" id="MQTT_USER" name="MQTT_USER" value=""> 
+                                        MQTT Password <input type="text" id="MQTT_PASS" name="MQTT_PASS" value="" onclick="mqtt_pass_onclick()"><br><br>
+                                        
+                                         
+                                         
+                                         <button type="button" onclick="SubmitMQTT(); return false;">Submit</button>
+                            </fieldset>
+                            
+                                   </td>
+                        </tr>
+                    </table>
+            
+            </div>
+ <!--           
+             <div id="HttpView" class="views grid">
+                 <table>
+						<thead>
+							<tr>
+								<th colspan="2">Webserver Settings</th>
+							</tr>
+						</thead>
+                        
+						<tbody>
+							<tr>
+                            <td>
+                            <fieldset>
+                                        <legend>Webserver settings</legend>
+                                        Username <input type="text" id="HTTP_USER" name="HTTP_USER" value=""><br>
+                                        Password <input type="password" id="HTTP_PASS" name="HTTP_PASS" value=""><br><br>
+                                        <button type="button" onclick="SubmitHTTP(); return false;">Submit</button>
+                            </fieldset>
+                            <fieldset>
+                            Username and password is used for <br>
+                            login at the Webinterface
+                            </fieldset>
+                            </td>
+                        </tr>
+                    </table>
+            
+            </div>
+-->			
+            <div id="Notes" class="views grid">
+         
+                     
+                     
+                      <table>
+						<thead>
+							<tr>
+                                <th colspan="2">Notes</th>
+                            	</tr>
+						</thead>
+                        <tbody>
+							<tr>
+                            <td>
+            
+            
+                        
+                        <fieldset>
+                         <legend>Up to 500 characters for your notes</legend>
+                            <textarea name="NotesText" id="NotesText" cols = "80" rows="10"></textarea><br>
+                            <button type="button" onclick="UpdateNote(); return false;">Update Notes</button>
+                        </fieldset>
+                        
+                        </td>
+                        </tr>
+                    </table>
+            
+				
+			</div>
+            	
+			<div id="WiFiSettings" class="views grid">
+				<div>
+					<table>
+						<thead>
+							<tr>
+								<th colspan="2">Network settings</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>SSID</td><td><select id="ssid"></select><br><button onclick="getSSIDList()">Refresh</button></td>
+							</tr>
+							<tr>
+								<td>Password</td><td><input type="password" id="pass"></td>
+							</tr>
+							<tr>
+								<td colspan="2"><button onclick="setWiFiSettings()">Connect</button></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<table>
+						<thead>
+							<tr>
+								<th>Current network configuration</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td id="currentSSID">-</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div id="uploadSettings" class="views grid">
+				<div>
+					<table>
+						<thead>
+							<tr>
+								<th colspan="2"><input type="checkbox" id="thingspeakEnabled" onclick="enableThingspeak()">Thingspeak</th>
+							</tr>
+						</thead>
+						<tbody id="thingspeakSettings">
+							<tr><td>API key</td><td><input type="text" id="thingspeakApi"></td></tr>
+							<tr><td>Wind speed</td><td><select id="tsfWindSpeed" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>Wind direction</td><td><select id="tsfWindDir" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>Rain amount</td><td><select id="tsfRainAmount" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>Temperature</td><td><select id="tsfTemperature" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>Humidity</td><td><select id="tsfHumidity" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>Airpressure</td><td><select id="tsfAirpressure" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>PM2.5</td><td><select id="tsfPM25" onchange="fillFieldSelect()"></select></td></tr>
+							<tr><td>PM10</td><td><select id="tsfPM10" onchange="fillFieldSelect()"></select></td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<table>
+						<thead>
+							<tr>
+								<th colspan="2"><input type="checkbox" id="senseBoxEnabled" onclick="enableSenseBox()">SenseBox</th>
+							</tr>
+						</thead>
+						<tbody id="senseBoxSettings">
+							<tr><td>Station ID</td><td><input type="text" id="senseBoxStationId"></td></tr>
+							<tr><td>Wind speed ID</td><td><input type="text" id="senseBoxWindSId"></td></tr>
+							<tr><td>Wind direction ID</td><td><input type="text" id="senseBoxWindDId"></td></tr>
+							<tr><td>Rain ID</td><td><input type="text" id="senseBoxRainId"></td></tr>
+							<tr><td>Temperature ID</td><td><input type="text" id="senseBoxTempId"></td></tr>
+							<tr><td>Humidity ID</td><td><input type="text" id="senseBoxHumId"></td></tr>
+							<tr><td>Pressure ID</td><td><input type="text" id="senseBoxPressId"></td></tr>
+							<tr><td>PM2.5 ID</td><td><input type="text" id="senseBoxPM25Id"></td></tr>
+							<tr><td>PM10 ID</td><td><input type="text" id="senseBoxPM10Id"></td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<table>
+						<thead>
+							<tr>
+								<th colspan="2">Upload interval</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Interval (minutes)</td><td><input type="number" id="uploadInterval" min="1"></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<table>
+					<thead>
+						<tr>
+							<th>Submit</th>
+						<tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><button onclick="setUploadSettings()">Submit settings</button></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div id="notification" class="notification">
+			</div>
+		</div>
+	</body>
+	<script>
+		var intervalList = [];
+        
+        function showMQTTPage(){
+            sendRequest("mqtt/settings", read_mqttsettings);
+            showView("MQTTView");
+        }
+		
+		function pageLoad() {
+			showWeatherData();
+		}
+        
+        function showWebserSettings(){
+            //sendRequest("mqtt/settings", read_mqttsettings);
+            showView("HttpView");
+        }
+        
+        //get a list of available SSIDs
+		function getSSIDList() {
+			openNotification("Getting network names...", 0);
+			sendRequest("getSSIDList", getSSIDListHandler);
+		}
+		function getSSIDListHandler(data, separator = ",") {
+			openNotification("Done");
+			setTimeout(closeNotification, 1000);
+			if (data == null)
+				return;
+			var ssids = data.split(separator);
+			var list = document.getElementById("ssid");
+			list.innerHTML = "";
+			if (ssids.length == 0) {
+				list.innerHTML = "<option value='0'>-</option>";
+				return;
+			}
+			for (var i = 0; i < ssids.length; i++) {
+				list.innerHTML += "<option value='" + ssids[i] + "'>" + ssids[i] + "</option>";
+			}
+		}
+
+		//get and set wifi settings
+		function setWiFiSettings() {
+			var ssid = document.getElementById("ssid").value;
+			var pass = document.getElementById("pass").value;
+			console.log("ssid: " + ssid + ", pass: " + pass);
+			var request = "setWiFiSettings?ssid=" + ssid + "&pass=" + pass;
+			sendRequest(request, openNotification);
+		}
+		function getWiFiSettings() {
+			openNotification("Getting data...", 0);
+			sendRequest("getWiFiSettings", getWiFiSettingsHandler);
+		}
+		function getWiFiSettingsHandler(data) {
+			var d = data.split(",");
+			document.getElementById("currentSSID").innerHTML = ((d[0] != "") ? d[0] : "No network configured");
+			getSSIDListHandler(d[1], ";");
+		}
+
+		//get and set thingspeak settings
+		function setUploadSettings() {
+			var tsApi = document.getElementById("thingspeakApi").value.replace(/\s/g,'');
+			var tsfWS = document.getElementById("tsfWindSpeed").value;
+			var tsfWD = document.getElementById("tsfWindDir").value;
+			var tsfRA = document.getElementById("tsfRainAmount").value;
+			var tsfT = document.getElementById("tsfTemperature").value;
+			var tsfH = document.getElementById("tsfHumidity").value;
+			var tsfA = document.getElementById("tsfAirpressure").value;
+			var tsfPM25 = document.getElementById("tsfPM25").value;
+			var tsfPM10 = document.getElementById("tsfPM10").value;
+			var tsEnabled = ((document.getElementById("thingspeakEnabled").checked) ? "1" : "0");
+			var sbStationId = document.getElementById("senseBoxStationId").value.replace(/\s/g,'');
+			var sbWindSId = document.getElementById("senseBoxWindSId").value.replace(/\s/g,'');
+			var sbWindDId = document.getElementById("senseBoxWindDId").value.replace(/\s/g,'');
+			var sbRainId = document.getElementById("senseBoxRainId").value.replace(/\s/g,'');
+			var sbTempId = document.getElementById("senseBoxTempId").value.replace(/\s/g,'');
+			var sbHumId = document.getElementById("senseBoxHumId").value.replace(/\s/g,'');
+			var sbPressId = document.getElementById("senseBoxPressId").value.replace(/\s/g,'');
+			var sbPM25Id = document.getElementById("senseBoxPM25Id").value.replace(/\s/g,'');
+			var sbPM10Id = document.getElementById("senseBoxPM10Id").value.replace(/\s/g,'');
+			var sbEnabled = ((document.getElementById("senseBoxEnabled").checked) ? "1" : "0");
+			var interval = document.getElementById("uploadInterval").value;
+			sendRequest("setUploadSettings?tsApi=" + tsApi + 
+				"&tsfWS=" + tsfWS +
+				"&tsfWD=" + tsfWD +
+				"&tsfRA=" + tsfRA +
+				"&tsfT=" + tsfT +
+				"&tsfH=" + tsfH +
+				"&tsfA=" + tsfA +
+				"&tsfPM25=" + tsfPM25 +
+				"&tsfPM10=" + tsfPM10 +
+				"&tsEnabled=" + tsEnabled + 
+				"&sbStationId=" + sbStationId +
+				"&sbWindSId=" + sbWindSId +
+				"&sbWindDId=" + sbWindDId +
+				"&sbRainId=" + sbRainId +
+				"&sbTempId=" + sbTempId +
+				"&sbHumId=" + sbHumId +
+				"&sbPressId=" + sbPressId +
+				"&sbPM25Id=" + sbPM25Id + 
+				"&sbPM10Id=" + sbPM10Id + 
+				"&sbEnabled=" + sbEnabled +
+				"&interval=" + interval, 
+				openNotification);
+		}
+		
+		function getUploadSettings() {
+			sendRequest("getUploadSettings", getUploadSettingsHandler);
+		}
+		
+		function getUploadSettingsHandler(data) {
+			var d = data.split(",");
+			document.getElementById("thingspeakApi").value = d[0];
+			document.getElementById("tsfWindSpeed").value = d[1];
+			document.getElementById("tsfWindDir").value = d[2];
+			document.getElementById("tsfRainAmount").value = d[3];
+			document.getElementById("tsfTemperature").value = d[4];
+			document.getElementById("tsfHumidity").value = d[5];
+			document.getElementById("tsfAirpressure").value = d[6];
+			document.getElementById("tsfPM25").value = d[7];
+			document.getElementById("tsfPM10").value = d[8];
+			document.getElementById("thingspeakEnabled").checked = (d[9] == "1");
+			
+			document.getElementById("senseBoxStationId").value = d[10];
+			document.getElementById("senseBoxWindSId").value = d[11];
+			document.getElementById("senseBoxWindDId").value = d[12];
+			document.getElementById("senseBoxRainId").value = d[13];
+			document.getElementById("senseBoxTempId").value = d[14];
+			document.getElementById("senseBoxHumId").value = d[15];
+			document.getElementById("senseBoxPressId").value = d[16];
+			document.getElementById("senseBoxPM25Id").value = d[17];
+			document.getElementById("senseBoxPM10Id").value = d[18];
+			document.getElementById("senseBoxEnabled").checked = (d[19] == "1");
+			
+			document.getElementById("uploadInterval").value = d[20];
+			
+			enableThingspeak();
+			enableSenseBox();
+		}
+
+		//get weather data
+		function getWeatherData() {
+			sendRequest("getWeatherData", getWeatherDataHandler);
+		}
+		function getWeatherDataHandler(data) {
+			var d = data.split(",");
+			var speed = parseFloat(d[0]).toFixed(2);
+			document.getElementById("windBeaufort").innerHTML = d[1];
+			var angle = parseInt(d[2]) * Math.PI/4;
+			if (!isNaN(angle) && !isNaN(speed))
+				showWind(angle, speed);
+			else
+				showWind(0, 0);
+			document.getElementById("temperature").innerHTML = d[3] + "&#8451;"; //degrees celcius
+			document.getElementById("humidity").innerHTML = d[4] + "%";
+			document.getElementById("pressure").innerHTML = d[5] + "hPa";
+			document.getElementById("PM25").innerHTML = d[6] + "&micro;g/m&sup3;"; //ug/m3
+			document.getElementById("PM10").innerHTML = d[7] + "&micro;g/m&sup3;";
+		}
+		
+		//get battery data
+		function getBatteryData() {
+			sendRequest("getBatteryData", getBatteryDataHandler);
+		}
+		function getBatteryDataHandler(data) {
+			var d = data.split(",");
+			document.getElementById("currentVoltage").innerHTML = d[0] + "V";
+			document.getElementById("chargingStatus").innerHTML = (d[1] == "1" ? "Yes" : "No");
+			document.getElementById("toggleChargingBtn").innerHTML = (d[1] == "1" ? "Stop" : "Start") + " charging";
+		}
+
+		function sendRequest(addr, func = null) {
+			console.log("requesting: " + addr);
+			requestPending = true;
+			var xhr = new XMLHttpRequest();
+			//xhr.timeout = 5000; //ms
+			xhr.open("GET", addr, true);
+			xhr.onload = function() {
+				console.log("Request finished");
+				requestPending = false;
+				if (func != null)
+					func(this.responseText);
+			}
+			xhr.onerror = function() {
+				console.log("Request finished");
+				requestPending = false;
+				console.log("error");
+			}
+			xhr.ontimeout = function() {
+				console.log("Request finished");
+				requestPending = false;
+				console.log("timeout");
+			}
+			xhr.send();
+		}
+
+		//open and close the main menu
+		function openMenu() {
+			document.getElementById("menu").classList.add("open");
+		}
+		function closeMenu() {
+			document.getElementById("menu").classList.remove("open");
+		}
+
+		//show and hide the notification bar
+		function openNotification(msg, timeout=2500) {
+			document.getElementById("notification").innerHTML = msg;
+			document.getElementById("notification").classList.add("open");
+			if (timeout != 0)
+				setTimeout(closeNotification, timeout);
+		}
+		function closeNotification() {
+			document.getElementById("notification").classList.remove("open");
+		}
+
+		//show the wifi settings, battery data or the weather data
+		function showWeatherData() {
+			showView("weatherData");
+			getWeatherData();
+			addInterval(getWeatherData, 5000);
+		}
+		function showBatteryData() {
+			showView("batteryData");
+			getBatteryData();
+			addInterval(getBatteryData, 2000);
+		}
+		function showWiFiSettings() {
+			showView("WiFiSettings");
+			getWiFiSettings();
+		}
+		function showUploadSettings() {
+			showView("uploadSettings");
+			getUploadSettings();
+			fillFieldSelect();
+		}
+		function showView(view) {
+			clearIntervalList();
+			Array.from(document.getElementsByClassName("views")).forEach(function(v) {v.style.display = "none";});
+			document.getElementById(view).style.display = "";
+			Array.from(document.getElementsByClassName("menuBtn")).forEach(function(b) {b.classList.remove("active")});
+			document.getElementById(view + "Btn").classList.add("active");
+			closeMenu();
+		}
+		function restart() {
+			sendRequest("restart", openNotification);
+		}
+		
+		//toggle battery charging
+		function toggleCharging() {
+			sendRequest("toggleCharging", openNotification);
+		}
+
+		//enable thingspeak/senseBox cb
+		function enableThingspeak() {
+			var cb = document.getElementById("thingspeakEnabled").checked;
+			document.getElementById("thingspeakSettings").style.display = (cb ? "" : "none");
+		}
+		
+		function enableSenseBox() {
+			var cb = document.getElementById("senseBoxEnabled").checked;
+			document.getElementById("senseBoxSettings").style.display = (cb ? "" : "none");
+		}
+		
+		//interval functions
+		function addInterval(func, period) {
+			console.log("Adding interval");
+			intervalList.push(setInterval(func, period));
+		}
+		
+		function clearIntervalList() {
+			console.log("Clearing intervals");
+			intervalList.forEach(function(i) {clearInterval(i);});
+			intervalList = [];
+		}
+		
+		function fillFieldSelect() {
+			var tsFields = ["tsfWindSpeed", "tsfWindDir", "tsfRainAmount", "tsfTemperature", "tsfHumidity", "tsfAirpressure", "tsfPM25", "tsfPM10"];
+			var selectedValues = [];
+			for (var i = 0; i < 8; i++) {
+				var val = document.getElementById(tsFields[i]).value;
+				if (val != 0)
+					selectedValues.push(val.toString());
+			}
+			
+			for (var a = 0; a < 8; a++) {
+				var field = document.getElementById(tsFields[a]);
+				var curVal = field.value;
+				field.innerHTML = "<option value='0'>-</option>";
+				for (var b = 1; b < 9; b++) {
+					//show only the fields which are not assigned
+					if (selectedValues.indexOf(b.toString()) == -1 || (selectedValues.indexOf(b.toString()) != -1 && b == curVal))
+						field.innerHTML += "<option value='" + b.toString() + "'>Field " + b.toString() + "</option>";
+					field.value = (curVal ? curVal : 0);
+				}
+			}
+		}
+		
+		//show wind direction and speed
+		function showWind(angle, speed) {
+			var canvas = document.getElementById("windCanvas");
+			var ctx = canvas.getContext("2d");
+			
+			//creating circle
+			ctx.fillStyle = "#eaeaea";
+			ctx.beginPath();
+			var x = canvas.width/2;
+			var y = canvas.height/2;
+			var rad = Math.min(canvas.width, canvas.height)/2;
+			ctx.arc(x, y, rad, 0, 2*Math.PI);
+			ctx.fill();
+			
+			//drawing angle lines
+			var nrOfLines = 8;
+			var length = 5;
+			ctx.strokeStyle = "#000";
+			for (var i = 0; i < nrOfLines; i++) {
+				ctx.beginPath();
+				ctx.moveTo(x + rad*Math.sin(Math.PI*2/nrOfLines*i), y + rad*Math.cos(Math.PI*2/nrOfLines*i));
+				ctx.lineTo(x + (rad - length)*Math.sin(Math.PI*2/nrOfLines*i), y + (rad - length)*Math.cos(Math.PI*2/nrOfLines*i));
+				ctx.stroke();
+			}
+			
+			//writing wind direction text
+			ctx.fillStyle = "#aaa";
+			ctx.font = "bold 20px Courier New";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText("N", x, y - 3*rad/4);
+			ctx.fillText("E", x + 3*rad/4, y);
+			ctx.fillText("S", x, y + 3*rad/4);
+			ctx.fillText("W", x - 3*rad/4, y);
+			
+			//calculating and drawing arrow position
+			var tHeight = 15; //px
+			var cAngle = Math.atan((tHeight/2)/(rad - tHeight));
+			ctx.fillStyle = "#f00";
+			ctx.beginPath();
+			ctx.moveTo(x + rad*Math.sin(angle), y - rad*Math.cos(angle));
+			ctx.lineTo(x + (rad - tHeight)*Math.sin(angle - cAngle), y - (rad - tHeight)*Math.cos(angle - cAngle));
+			ctx.lineTo(x + (rad - tHeight)*Math.sin(angle + cAngle), y - (rad - tHeight)*Math.cos(angle + cAngle));
+			ctx.fill();
+			
+			//writing speed text
+			ctx.fillStyle = "#000";
+			ctx.font = "bold 30px Courier New";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "bottom";
+			ctx.fillText(speed, x, y);
+			ctx.font = "bold 20px Courier New";
+			ctx.textBaseline = "top";
+			ctx.fillText("km/h", x, y);
+		}
+        
+        
+        function showNotes(){
+            showView("Notes");
+            LoadNotes();
+        }
+        
+         function LoadNotes(){
+            sendRequest("notes.dat", read_notes);
+        
+        }
+        
+        function read_notes(msg){
+            //Plain text 
+            var element = document.getElementById("NotesText");
+            element.value = msg;
+            
+        }
+        
+                function UpdateNote(){
+            var protocol = location.protocol;
+            var slashes = protocol.concat("//");
+            var host = slashes.concat(window.location.hostname);
+            var url = host + "/notes.dat";
+            
+            var element = document.getElementById("NotesText");
+            var text= element.value;
+            text = text.substring(0, 500);
+            
+            
+            
+            
+            var data = [];
+            data.push({key:"notes",
+                       value: text});
+            sendData(url,data); 
+             
+             
+        
+        }
+        
+         function read_mqttsettings( msg ){
+            var jsonObj = JSON.parse(msg);
+            
+            
+            document.getElementById("MQTT_USER").value = jsonObj.mqttuser;
+            document.getElementById("MQTT_HOST").value = jsonObj.mqtthost;
+            document.getElementById("MQTT_SERVER").value = jsonObj.mqttserver;
+            document.getElementById("MQTT_PORT").value = jsonObj.mqttport;
+            document.getElementById("MQTT_PASS").value = jsonObj.mqttpass;
+            document.getElementById("MQTT_TOPIC").value = jsonObj.mqtttopic;
+            document.getElementById("MQTT_PASS").type = "password";
+            document.getElementById("MQTT_ENA").checked = jsonObj.mqttena;
+            document.getElementById("MQTT_UPDATE_INT").value = jsonObj.mqtttxintervall;
+             
+            
+        }
+        
+        
+          function SubmitMQTT( ){
+            var protocol = location.protocol;
+            var slashes = protocol.concat("//");
+            var host = slashes.concat(window.location.hostname);
+            var url = host + "/mqtt/settings";
+            
+            
+            var mqtt_user = document.getElementById("MQTT_USER").value;
+            var mqtt_host = document.getElementById("MQTT_HOST").value;
+            var mqtt_server = document.getElementById("MQTT_SERVER").value;
+            var mqtt_port = document.getElementById("MQTT_PORT").value;
+            var mqtt_topic =  document.getElementById("MQTT_TOPIC").value;
+            var mqtt_ena = document.getElementById("MQTT_ENA").checked;
+            var mqtt_txintervall =  document.getElementById("MQTT_UPDATE_INT").value;
+            
+            
+            var data = [];
+            data.push({key:"MQTT_ENA",
+                           value: mqtt_ena}); 
+            
+            data.push({key:"MQTT_PORT",
+                           value: mqtt_port});
+           
+            
+            data.push({key:"MQTT_USER",
+                       value: mqtt_user});
+                       
+            data.push({key:"MQTT_HOST",
+                       value: mqtt_host});
+            
+            
+            data.push({key:"MQTT_SERVER",
+                       value: mqtt_server});
+                       
+            data.push({key:"MQTT_TOPIC",
+                       value: mqtt_topic});
+                     
+                     
+            data.push({key:"MQTT_TXINTERVALL",
+                       value: mqtt_txintervall});
+            
+            if( "password" != document.getElementById("MQTT_PASS").type){
+                var mqtt_pass = document.getElementById("MQTT_PASS").value;
+                data.push({key:"MQTT_PASS",
+                       value: mqtt_pass});
+                
+                document.getElementById("MQTT_PASS").value = "********";
+                document.getElementById("MQTT_PASS").type = "password";
+                
+            }            
+                       
+            sendData(url,data); 
+             
+             
+            
+        
+        }
+        
+        function SubmitHTTP(){
+            var pass = document.getElementById("HTTP_PASS").value; 
+            var user = document.getElementById("HTTP_USER").value;
+            
+            var protocol = location.protocol;
+            var slashes = protocol.concat("//");
+            var host = slashes.concat(window.location.hostname);
+            var url = host + "/web/settings";
+            
+            var data = [];
+            data.push({key:"HTTP_PASS",
+                           value: pass}); 
+            
+            data.push({key:"HTTP_USER",
+                           value: user});
+                           
+            sendData(url,data); 
+        
+        }
+ 
+        
+        
+        function mqtt_pass_onclick(){
+        
+                document.getElementById("MQTT_PASS").value = "";
+                document.getElementById("MQTT_PASS").type == "text";
+       
+       }
+       
+       
+            function sendData(url,data) {       
+          var XHR = new XMLHttpRequest();
+          var urlEncodedData = "";
+          var urlEncodedDataPairs = [];
+          var name;
+
+          for(name in data) {
+            urlEncodedDataPairs.push(encodeURIComponent(data[name].key) + '=' + encodeURIComponent(data[name].value));
+          }
+
+          urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+          XHR.addEventListener('load', function(event) {
+            /*   */
+          });
+
+          XHR.addEventListener('error', function(event) {
+            alert('Oops! Something goes wrong.');
+          });
+
+          XHR.open('POST', url);
+          XHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+          XHR.send(urlEncodedData);
+          
+        }
+                
+        function leftPad(num, size) {
+            var s = num+"";
+            while (s.length < size) s = "0" + s;
+            return s;
+        }
+
+	</script>
+</html>

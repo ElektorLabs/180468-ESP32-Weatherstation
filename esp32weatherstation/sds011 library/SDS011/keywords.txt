@@ -1,0 +1,49 @@
+#######################################
+# Syntax Coloring Map For SDS011
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+SDS011	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+getQueryId	KEYWORD2
+setQueryId	KEYWORD2
+getMode	KEYWORD2
+setMode	KEYWORD2
+getData	KEYWORD2
+setDeviceId	KEYWORD2
+getSleepMode	KEYWORD2
+setSleepMode	KEYWORD2
+getWorkingPeriod	KEYWORD2
+setWorkingPeriod	KEYWORD2
+getFirmwareVersion	KEYWORD2
+printBuf	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+SDS_SEND_DATA_LENGTH	LITERAL1
+SDS_RECV_DATA_LENGTH	LITERAL1
+SDS_READ_TIMEOUT	LITERAL1
+SDS_CMD_SET_MODE	LITERAL1
+SDS_CMD_QUERY_DATA	LITERAL1
+SDS_CMD_SET_DEVICE_ID	LITERAL1
+SDS_CMD_SET_SLEEP	LITERAL1
+SDS_CMD_CHECK_FIRMWARE_VERSION	LITERAL1
+SDS_CMD_SET_WORKING_PERIOD	LITERAL1
+SDS_RECCMD	LITERAL1
+SDS_RECCMD_QUERY	LITERAL1
+SDS_GET_MODE	LITERAL1
+SDS_SET_MODE	LITERAL1
+SDS_SET_CONTINUOUS	LITERAL1
+SDS_SET_QUERY	LITERAL1
+SDS_SET_SLEEP	LITERAL1
+SDS_SET_WORK	LITERAL1
+
