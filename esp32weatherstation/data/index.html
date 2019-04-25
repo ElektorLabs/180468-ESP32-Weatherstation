@@ -211,6 +211,20 @@
 						</tbody>
 					</table>
 				</div>
+                <div>
+					<table class="vertical">
+						<thead>
+							<tr>
+								<th colspan="2">Rain</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Average mm</td><td id="AVGRAIN">-</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
 			</div>
 			
 			<div id="batteryData" class="views">
@@ -586,6 +600,7 @@
 			document.getElementById("pressure").innerHTML = d[5] + "hPa";
 			document.getElementById("PM25").innerHTML = d[6] + "&micro;g/m&sup3;"; //ug/m3
 			document.getElementById("PM10").innerHTML = d[7] + "&micro;g/m&sup3;";
+            document.getElementById("AVGRAIN").innerHTML = d[8];
 		}
 		
 		//get battery data

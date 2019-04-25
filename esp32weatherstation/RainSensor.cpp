@@ -21,6 +21,6 @@ float RainSensor::getRainAmount(bool clearVars) {
   float temp = rainAmount;
   if (clearVars)
     rainAmount = 0;
+    lastClear=millis();
   return temp;
 }
-

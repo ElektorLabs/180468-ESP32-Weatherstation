@@ -1,5 +1,11 @@
 //network settings
 #include "webfunctions.h"
+#include <ESPmDNS.h>
+#include <DNSServer.h>
+
+#define DNS_PORT ( 53 )
+
+DNSServer* dnsServer=NULL;
 
 uint8_t macAddr[6];
 char stringBufferAP[33]; 
@@ -7,7 +13,6 @@ String APSSID = "ESP32 XX:XX:XX";
 
 String ssid;
 String pass;
-
 
 String SSIDList(String separator = ",") {
   Serial.println("Scanning networks");
@@ -125,7 +130,8 @@ void getWeatherData() {
   response += String(humidity) + ",";
   response += String(pressure) + ",";
   response += String(PM25) + ",";
-  response += String(PM10);
+  response += String(PM10) +",";
+  response += String(rainAmountAvg);
   sendData(response);
 }
 
@@ -247,6 +253,7 @@ bool connectWiFi() {
   Serial.println("Connected to " + ssid);
   Serial.print("Local IP: ");
   Serial.println(WiFi.localIP());
+  
   return true;
 }
 
@@ -258,14 +265,25 @@ void configureSoftAP() {
   snprintf(stringBufferAP,32,"ESP32 Weatherstation %02x:%02x:%02x",macAddr[3],macAddr[4],macAddr[5]);
   APSSID = stringBufferAP;
   Serial.println("Configuring AP: " + String(APSSID));
-  WiFi.softAP(APSSID.c_str(), NULL, 1, 0, 1);
+  WiFi.softAP(APSSID.c_str(), NULL, 1, 0, 4);
   IPAddress ip = WiFi.softAPIP();
   Serial.print("AP IP: ");
   Serial.println(ip);
   lastAPConnection = millis();
   digitalWrite(APLed, HIGH);
 
+  dnsServer = new DNSServer();
+  dnsServer->start(DNS_PORT, "*", ip);
+
+  /* Setup MDNS */
+  if (!MDNS.begin("Weatherstation")) {
+    Serial.println("Start MDNS: fail");   
+  } else { 
+    Serial.println("Start MDNS: okay");   
+  }
+  
   configureServer();
+
 }
 
 //initialize the webserver on port 80
@@ -337,4 +355,16 @@ String WiFiStatusToString() {
     case WL_NO_SHIELD:       return "NO SHIELD"; break;
     default:                 return "Undefined: " + String(WiFi.status()); break;
   }
+}
+
+void NetworkTask( void ){
+  //handle WiFi
+  if (server != NULL){
+    server->handleClient();
+  }
+  
+  if(dnsServer!=NULL){
+     dnsServer->processNextRequest();
+  }
+  
 }

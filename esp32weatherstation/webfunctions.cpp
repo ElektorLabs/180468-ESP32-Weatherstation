@@ -1,6 +1,5 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
-#include <WebSocketsServer.h>
 #include "datastore.h"
 #include "webfunctions.h"
 
@@ -194,10 +193,9 @@ void read_mqttsetting(){
   mqttsettings_t Data;
   Data = eepread_mqttsettings();
   //loadMQTTSettings(&Data);  
-  const size_t capacity = JSON_OBJECT_SIZE(7);
-  DynamicJsonBuffer jsonBuffer(2000); 
+  DynamicJsonDocument  root(2000); 
   
-  JsonObject& root = jsonBuffer.createObject();
+ 
   root["mqttena"]= (bool)(Data.enable);
   root["mqttserver"] = String(Data.mqttservername);
   root["mqtthost"] = String(Data.mqtthostname);
@@ -211,11 +209,7 @@ void read_mqttsetting(){
     root["mqttpass"] ="";
   }
 
-  root.printTo(response);
+  serializeJson(root,response);
   sendData(response);
 
 }
-
-
-
-

@@ -8,11 +8,9 @@
  * From Library Manager
  * Adafruit BME280 Library 1.0.7 by Adafruit
  * Adafruit Unified Sensor 1.0.2 by Adafruit
- * ArduinoJson 5.x.x by Benoit Blanchon
+ * ArduinoJson 6.x.x by Benoit Blanchon
  * PubSubClient by Nick O'Leary 
- * 
- * Install manual:
- * SDS011 by Elektor ( found in the folder )
+ * CRC32 by Christopher Baker
  * 
  *********************************************************************************************/
 
@@ -26,6 +24,7 @@
 #include <Adafruit_BME280.h>
 #include <Wire.h>
 #include <SDS011.h>
+#include "Honnywhell.h"
 #include "WindSensor.h"
 #include "RainSensor.h"
 #include "datastore.h"
@@ -121,7 +120,21 @@ unsigned long lastBattMeasurement = 0;
 WindSensor ws(windSpeedPin, windDirPin);
 RainSensor rs(rainPin);
 Adafruit_BME280 bme;
+
+
+#define USE_SDS011
+//#define USE_HONNYWHELLHPM
+
+#ifdef USE_SDS011
+/* If SDS011 is connected */
 SDS011 sds(Serial1);
+#endif
+
+#ifdef USE_HONNYWHELLHPM
+/* If Honnywhell sensor is connected */
+/* Warning Code is untested and not supported */
+HonnywhellHPM hpm(Serial1);
+#endif
 
 //webserver, client and secure client pointers
 WebServer* server = NULL;
@@ -188,8 +201,13 @@ void setup() {
                     Adafruit_BME280::FILTER_OFF);
   }
 
-  sds.setMode(SDS_SET_QUERY);
-  
+  #ifdef USE_SDS011 
+    sds.setMode(SDS_SET_QUERY);
+  #endif
+
+  #ifdef USE_HONNYWHELLHPM
+    hpm.begin();
+  #endif
   Setup_MQTT_Task();
  
   
@@ -199,9 +217,7 @@ void loop() {
   //serial debugging
   checkSerial();
   
-  //handle WiFi
-  if (server != NULL)
-    server->handleClient();
+  NetworkTask();
 
   //if the current wifi mode isn't STA and the timout time has passed -> restart
   if ((WiFi.getMode() != WIFI_STA) && ((lastAPConnection + lastConnectedTimeout) < millis())) {
@@ -232,11 +248,23 @@ void loop() {
   }
 
   //read SDS011 every minute
+  #ifdef USE_SDS011
   if ((lastSDSTime + sdsInterval) < millis()) {
     lastSDSTime = millis();
     if (!sds.getData(&PM25, &PM10))
       Serial.println("Failed to read SDS011");
   }
+  #endif
+
+  #ifdef HONNYWHELLHPM
+    hpm.ProcessData();
+    if ((lastSDSTime + sdsInterval) < millis()) {
+      lastSDSTime = millis();
+      if (!hpm.getData(&PM25, &PM10))
+        Serial.println("Failed to read HPM");
+      }
+   
+  #endif
   
   //upload data if the uploadperiod has passed and if WiFi is connected
   if (((lastUploadTime + uploadInterval) < millis()) && (WiFi.status() == WL_CONNECTED)) {
@@ -271,7 +299,7 @@ void loop() {
     lastBattMeasurement = millis();
     float adcVoltage = ((float)analogRead(measBatt)/4096) * 3.3 + 0.15; //0.15 offset from real value
     batteryVoltage = adcVoltage * 570 / 100 + 0.7; //analog read between 0 and 3.3v * resistor divider + 0.7v diode drop
-    Serial.println("adc voltage: " + String(adcVoltage) + ", batt voltage: " + String(batteryVoltage) + ", currently charging: " + String(batteryCharging ? "yes" : "no"));
+    //Serial.println("adc voltage: " + String(adcVoltage) + ", batt voltage: " + String(batteryVoltage) + ", currently charging: " + String(batteryCharging ? "yes" : "no"));
     if (batteryVoltage > battFull)
       batteryCharging = false;
     if (batteryVoltage < battLow)
@@ -320,7 +348,7 @@ void readBME() {
 
 void MQTT_Task( void* prarm ){
    const size_t capacity = 3*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(7);
-   DynamicJsonBuffer jsonBuffer(capacity);
+   DynamicJsonDocument  root(capacity);
    String JsonString = "";
    uint32_t ulNotificationValue;
    int32_t last_message = millis();
@@ -374,9 +402,8 @@ void MQTT_Task( void* prarm ){
               last_message=millis();
               JsonString="";
               /* Every minute we send a new set of data to the mqtt channel */
-              JsonObject& root = jsonBuffer.createObject();
-              JsonObject& data = root.createNestedObject("data");            
-              JsonObject& data_wind = data.createNestedObject("wind");
+              JsonObject data = root.createNestedObject("data");            
+              JsonObject data_wind = data.createNestedObject("wind");
               data_wind["direction"] = windDirAvg;
               data_wind["speed"] = windSpeedAvg;
               data["rain"] = rainAmountAvg;
@@ -386,10 +413,10 @@ void MQTT_Task( void* prarm ){
               data["PM2_5"] = PM25;
               data["PM10"] = PM10;
               
-              JsonObject& station = root.createNestedObject("station");
+              JsonObject station = root.createNestedObject("station");
               station["battery"] = batteryVoltage;
               station["charging"] = batteryCharging;
-              root.printTo(JsonString);
+              serializeJson(root,JsonString);
               Serial.println(JsonString);
               mqttclient.publish(Settings.mqtttopic, JsonString.c_str(), true); 
             }
@@ -405,6 +432,3 @@ void MQTT_Task( void* prarm ){
 void callback(char* topic, byte* payload, unsigned int length) {
 
 }
-
-
-
