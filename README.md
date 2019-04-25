@@ -17,8 +17,9 @@ The station shall be detected via usb as serial port. Set the ide to use the por
 ##### From Library Manager
  * Adafruit BME280 Library 1.0.7 by Adafruit
  * Adafruit Unified Sensor 1.0.2 by Adafruit
- * ArduinoJson 5.x.x by Benoit Blanchon
+ * ArduinoJson 6.x.x by Benoit Blanchon
  * PubSubClient by Nick O'Leary 
+ * CRC32 by Christopher Baker
   
 
 ##### Install manual:
