@@ -24,7 +24,7 @@
 #include <Adafruit_BME280.h>
 #include <Wire.h>
 #include <SDS011.h>
-#include "Honnywhell.h"
+#include "Honnywell.h"
 #include "WindSensor.h"
 #include "RainSensor.h"
 #include "datastore.h"
@@ -123,17 +123,17 @@ Adafruit_BME280 bme;
 
 
 #define USE_SDS011
-//#define USE_HONNYWHELLHPM
+//#define USE_HonnywellHPM
 
 #ifdef USE_SDS011
 /* If SDS011 is connected */
 SDS011 sds(Serial1);
 #endif
 
-#ifdef USE_HONNYWHELLHPM
-/* If Honnywhell sensor is connected */
+#ifdef USE_HonnywellHPM
+/* If Honnywell sensor is connected */
 /* Warning Code is untested and not supported */
-HonnywhellHPM hpm(Serial1);
+HonnywellHPM hpm(Serial1);
 #endif
 
 //webserver, client and secure client pointers
@@ -205,7 +205,7 @@ void setup() {
     sds.setMode(SDS_SET_QUERY);
   #endif
 
-  #ifdef USE_HONNYWHELLHPM
+  #ifdef USE_HonnywellHPM
     hpm.begin();
   #endif
   Setup_MQTT_Task();
@@ -256,7 +256,7 @@ void loop() {
   }
   #endif
 
-  #ifdef HONNYWHELLHPM
+  #ifdef HonnywellHPM
     hpm.ProcessData();
     if ((lastSDSTime + sdsInterval) < millis()) {
       lastSDSTime = millis();

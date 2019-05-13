@@ -1,10 +1,10 @@
-#include "Honnywhell.h"
+#include "Honnywell.h"
 
-HonnywhellHPM::HonnywhellHPM(Stream &_ser):ser(_ser){
+HonnywellHPM::HonnywellHPM(Stream &_ser):ser(_ser){
   /* Nothing more to do here */
 }
 
-void HonnywhellHPM::begin(){
+void HonnywellHPM::begin(){
   delay(5);             // Set serial mode of HPM sensor to continuous read mode
   ser.print(0x68);
   ser.print(0x01);
@@ -18,14 +18,14 @@ void HonnywhellHPM::begin(){
   delay(1000);
 }
 
-void HonnywhellHPM::ProcessData(){
+void HonnywellHPM::ProcessData(){
    while(ser.available()) {
     hpmDecode((byte) ser.read());
    }
 }
 
 
-void HonnywhellHPM::hpmDecode(byte x) 
+void HonnywellHPM::hpmDecode(byte x) 
 {
   // Process HPM Sensor serial data, see https://sensing.honeywell.com/honeywell-sensing-hpm-series-particle-sensors-datasheet-32322550-c-en.pdf
   static byte hpmBuffer[32];
@@ -97,7 +97,7 @@ void HonnywhellHPM::hpmDecode(byte x)
   lastx = x;
 }
 
-bool HonnywhellHPM::getData(float *p25, float *p10){
+bool HonnywellHPM::getData(float *p25, float *p10){
   *p25 = (float)hpmPM25 ;
   *p10 = (float)hpmPM10;
   if( (millis() - hpmAge ) > 2000 ){
