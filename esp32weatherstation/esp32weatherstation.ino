@@ -1,3 +1,7 @@
+
+
+
+
 /******************************************************************************************
  * 
  * Elektor ESP32 based Weaterstation 
@@ -21,10 +25,15 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <Preferences.h>
+/* I2C Sensors */
+#include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include <Adafruit_VEML6070.h>
+#include <Adafruit_TSL2561_U.h>
+
 #include <Wire.h>
 #include <SDS011.h>
-#include "Honnywhell.h"
+#include "Honnywell.h"
 #include "WindSensor.h"
 #include "RainSensor.h"
 #include "datastore.h"
@@ -101,6 +110,11 @@ float humidity = 0; //%
 float pressure = 0; //hPa
 bool bmeRead = 0;
 
+int16_t uv_level = 0;
+
+float lux_level = 0;
+bool has_TSL2561 = true;
+
 float PM10 = 0; //particle size: 10 um or less
 float PM25 = 0; //particle size: 2.5 um or less
 
@@ -117,23 +131,29 @@ unsigned long lastUploadTime = 0;
 unsigned long lastAPConnection = 0;
 unsigned long lastBattMeasurement = 0;
 
+
+
+
+
 WindSensor ws(windSpeedPin, windDirPin);
 RainSensor rs(rainPin);
 Adafruit_BME280 bme;
+Adafruit_VEML6070 uv = Adafruit_VEML6070();
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
 
 #define USE_SDS011
-//#define USE_HONNYWHELLHPM
+//#define USE_HONNYWELLHPM
 
 #ifdef USE_SDS011
 /* If SDS011 is connected */
 SDS011 sds(Serial1);
 #endif
 
-#ifdef USE_HONNYWHELLHPM
+#ifdef USE_HONNYWELLHPM
 /* If Honnywhell sensor is connected */
 /* Warning Code is untested and not supported */
-HonnywhellHPM hpm(Serial1);
+HonnywellHPM hpm(Serial1);
 #endif
 
 //webserver, client and secure client pointers
@@ -200,12 +220,30 @@ void setup() {
                     Adafruit_BME280::SAMPLING_X1, // humidity
                     Adafruit_BME280::FILTER_OFF);
   }
+    if(!tsl.begin())
+  {
+    /* There was a problem detecting the TSL2561 ... check your connections */
+    Serial.println("No TSL2561 detected, searched on ADDR:0x39, ( addr pin floating )");
+    has_TSL2561 = false;
+  } else {
+     tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+     /* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
+     //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
+     // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+     tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
+     has_TSL2561 = true;
+  }
+
+  uv.begin(VEML6070_1_T);  // pass in the integration time constant
+  
 
   #ifdef USE_SDS011 
     sds.setMode(SDS_SET_QUERY);
+    Serial.println("Using SDS011");
   #endif
 
   #ifdef USE_HONNYWHELLHPM
+    Serial.println("Using Honnywell HPM");
     hpm.begin();
   #endif
   Setup_MQTT_Task();
@@ -241,10 +279,12 @@ void loop() {
   readWindSensor();
   readRainSensor();
 
-  //read bme280 every 5 seconds
+  //read bme280 every 5 seconds, also UV and Light
   if ((lastBMETime + bmeInterval) < millis()) {
     lastBMETime = millis();
     readBME();
+    readUV();
+    readLux();
   }
 
   //read SDS011 every minute
@@ -256,7 +296,7 @@ void loop() {
   }
   #endif
 
-  #ifdef HONNYWHELLHPM
+  #ifdef HONNYWELLHPM
     hpm.ProcessData();
     if ((lastSDSTime + sdsInterval) < millis()) {
       lastSDSTime = millis();
@@ -346,6 +386,29 @@ void readBME() {
   }
 }
 
+void readUV( void ){
+  uint16_t level = uv.readUV();
+  uv_level = level; // library can return -1 in case of an error but it is casted to uint16_t ........
+}
+
+void readLux( void ){
+  if(has_TSL2561==false){
+   lux_level=0;
+  } else {
+  sensors_event_t event;
+    tsl.getEvent(&event);
+   
+    /* Display the results (light is measured in lux) */
+    if (event.light)
+    {
+      //Serial.print(event.light); Serial.println(" lux");
+      lux_level = event.light;
+      
+    }
+  }
+}
+ 
+
 void MQTT_Task( void* prarm ){
    const size_t capacity = 3*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(7);
    DynamicJsonDocument  root(capacity);
@@ -412,6 +475,8 @@ void MQTT_Task( void* prarm ){
               data["airpressure"] = pressure;
               data["PM2_5"] = PM25;
               data["PM10"] = PM10;
+              data["Lux"] = lux_level;
+              data["UV"] = uv_level;
               
               JsonObject station = root.createNestedObject("station");
               station["battery"] = batteryVoltage;

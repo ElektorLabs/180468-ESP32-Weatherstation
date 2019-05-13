@@ -2,7 +2,7 @@
  #define __HONNYWHELL_H__
   #include "Arduino.h"
 
-  class HonnywhellHPM{
+  class HonnywellHPM{
     private:
       uint32_t hpmAge = 1;   // Time in milliseconds since last valid read out --> ttl = millis() - hpmAge;
       uint16_t hpmPM25 = 0;   // Last read for 2.5 ug/m3
@@ -15,7 +15,7 @@
       void hpmDecode(byte x);
     
     public:
-      HonnywhellHPM(Stream &_ser);
+      HonnywellHPM(Stream &_ser);
       void begin();
       void ProcessData( void );
       uint32_t GethpmAge( void ); 
