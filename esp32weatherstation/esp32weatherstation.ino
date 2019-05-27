@@ -18,6 +18,7 @@
  * 
  *********************************************************************************************/
 
+
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
@@ -39,6 +40,7 @@
 #include "datastore.h"
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
+
 
 #define solarRelay 18
 #define measBatt 34
@@ -410,8 +412,7 @@ void readLux( void ){
  
 
 void MQTT_Task( void* prarm ){
-   const size_t capacity = 3*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(7);
-   DynamicJsonDocument  root(capacity);
+   DynamicJsonDocument  root(2048);
    String JsonString = "";
    uint32_t ulNotificationValue;
    int32_t last_message = millis();
@@ -460,16 +461,17 @@ void MQTT_Task( void* prarm ){
        } else{
             mqttclient.loop();                            // loop on client
             /* Check if we need to send data to the MQTT Topic, currently hardcode intervall */
-            uint32_t intervall_end = last_message +( Settings.mqtttxintervall * 60000 );
+            uint32_t intervall_end = last_message +( Settings.mqtttxintervall * 1000 );
             if( ( Settings.mqtttxintervall > 0) && ( intervall_end  <  millis() ) ){
               last_message=millis();
               JsonString="";
+              root.clear();
               /* Every minute we send a new set of data to the mqtt channel */
               JsonObject data = root.createNestedObject("data");            
               JsonObject data_wind = data.createNestedObject("wind");
-              data_wind["direction"] = windDirAvg;
-              data_wind["speed"] = windSpeedAvg;
-              data["rain"] = rainAmountAvg;
+              data_wind["direction"] = windDir*45;
+              data_wind["speed"] = windSpeed*3.6;
+              data["rain"] =  rs.getRainAmount(true) * hourMs / Settings.mqtttxintervall ;
               data["temperature"] = temperature;
               data["humidity"] = humidity;
               data["airpressure"] = pressure;
@@ -482,8 +484,10 @@ void MQTT_Task( void* prarm ){
               station["battery"] = batteryVoltage;
               station["charging"] = batteryCharging;
               serializeJson(root,JsonString);
-              Serial.println(JsonString);
-              mqttclient.publish(Settings.mqtttopic, JsonString.c_str(), true); 
+             
+              if ( 0 == mqttclient.publish(Settings.mqtttopic, JsonString.c_str())){
+                Serial.println("MQTT pub failed");  
+              }
             }
        }
        vTaskDelay( 100/portTICK_PERIOD_MS );

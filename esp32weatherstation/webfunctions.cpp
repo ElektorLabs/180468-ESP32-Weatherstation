@@ -121,6 +121,7 @@ void mqttsettings_update( ){
     /* we are missong something here */
   } else { 
     String value = server->arg("MQTT_USER");
+    bzero(Data.mqttusername,sizeof(Data.mqttusername));
     strncpy(Data.mqttusername, value.c_str(),128);
   }
 
@@ -128,6 +129,7 @@ void mqttsettings_update( ){
     /* we are missong something here */
   } else { 
     String value = server->arg("MQTT_PASS");
+    bzero(Data.mqttpassword,sizeof(Data.mqttpassword));
     strncpy(Data.mqttpassword, value.c_str(),128);
   }
 
@@ -135,6 +137,7 @@ void mqttsettings_update( ){
     /* we are missong something here */
   } else { 
     String value = server->arg("MQTT_SERVER");
+    bzero(Data.mqttservername,sizeof(Data.mqttservername));
     strncpy(Data.mqttservername, value.c_str(),128);
   }
 
@@ -142,6 +145,7 @@ void mqttsettings_update( ){
     /* we are missong something here */
   } else { 
     String value = server->arg("MQTT_HOST");
+    bzero(Data.mqtthostname,sizeof(Data.mqtthostname));
     strncpy(Data.mqtthostname, value.c_str(),64);
   }
 
@@ -158,6 +162,7 @@ void mqttsettings_update( ){
     /* we are missong something here */
   } else { 
     String value = server->arg("MQTT_TOPIC");
+    bzero(Data.mqtttopic,sizeof(Data.mqtttopic));
     strncpy(Data.mqtttopic, value.c_str(),500);
   }
 
