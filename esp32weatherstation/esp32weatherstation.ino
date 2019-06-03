@@ -347,8 +347,8 @@ void readBME() {
 }
 
 void MQTT_Task( void* prarm ){
-   const size_t capacity = 3*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(7);
-   DynamicJsonDocument  root(capacity);
+   
+   DynamicJsonDocument  root(300);
    String JsonString = "";
    uint32_t ulNotificationValue;
    int32_t last_message = millis();
