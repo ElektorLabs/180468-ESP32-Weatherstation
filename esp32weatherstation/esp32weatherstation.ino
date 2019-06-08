@@ -38,9 +38,9 @@
 #include "WindSensor.h"
 #include "RainSensor.h"
 #include "datastore.h"
-#include <ArduinoJson.h>
-#include <PubSubClient.h>
-
+#include "mqtt_task.h"
+#include "NTP_Client.h"
+#include "timecore.h"
 
 #define solarRelay 18
 #define measBatt 34
@@ -163,27 +163,28 @@ WebServer* server = NULL;
 WiFiClient* client = NULL;
 WiFiClientSecure* clientS = NULL;
 
-WiFiClient espClient;                       // WiFi ESP Client  
-PubSubClient mqttclient(espClient);             // MQTT Client 
+
 
 Preferences pref;
 
-TaskHandle_t MQTTTaskHandle = NULL;
+Timecore timec;
+NTP_Client NTPC;
 
-void Setup_MQTT_Task( void ){
+Ticker TimeKeeper;
 
-   xTaskCreatePinnedToCore(
-   MQTT_Task,
-   "MQTT_Task",
-   10000,
-   NULL,
-   1,
-   &MQTTTaskHandle,
-   1);
-
-}
+void _1SecondTick( void );
 
 void setup() {
+  //first we enable the dynamic frequency scaling to reduce power consumption
+  /*
+  esp_pm_config_esp32_t dynamicsettings;
+  dynamicsettings.maxfreq_mhz = ESP32_DEFAULT_CPU_FREQ_80;
+  dynamicsettings.min_freq_mhz = 10000000; 
+  dynamicsettings.light_sleep_enable = false;
+  if(ESP_OK  != esp_pm_configure(&dynamicsettings){
+    
+  }
+  */
   // put your setup code here, to run once:
   Serial.begin(115200);
   Serial1.begin(9600);
@@ -210,6 +211,14 @@ void setup() {
   ws.initWindSensor();
   rs.initRainSensor();
   
+  /* We read the Config from flash */
+  Serial.println(F("Read Timecore Config"));
+  timecoreconf_t cfg = read_timecoreconf();
+  timec.SetConfig(cfg);
+  /* Now we start with the config for the Timekeeping and sync */
+  TimeKeeper.attach_ms(1000, _1SecondTick);
+  
+
   Wire.begin(25, 26, 100000); //sda, scl, freq=100kHz
   if(false == bme.begin(bmeAddress)){
         hasBME280 = false;
@@ -248,7 +257,9 @@ void setup() {
     Serial.println("Using Honnywell HPM");
     hpm.begin();
   #endif
-  Setup_MQTT_Task();
+  MQTTTaskStart();
+
+
  
   
 }
@@ -411,93 +422,14 @@ void readLux( void ){
 }
  
 
-void MQTT_Task( void* prarm ){
-   DynamicJsonDocument  root(2048);
-   String JsonString = "";
-   uint32_t ulNotificationValue;
-   int32_t last_message = millis();
-   mqttsettings_t Settings = eepread_mqttsettings();
-                         
-   Serial.println("MQTT Thread Start");
-   mqttclient.setCallback(callback);             // define Callback function
-   while(1==1){
-
-   /* if settings have changed we need to inform this task that a reload and reconnect is requiered */ 
-   if(Settings.enable != false){
-    ulNotificationValue = ulTaskNotifyTake( pdTRUE, 0 );
-   } else {
-    Serial.println("MQTT disabled, going to sleep");
-    if(true == mqttclient.connected() ){
-        mqttclient.disconnect();
-    }
-    ulNotificationValue = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-    Serial.println("MQTT awake from sleep");
-   }
-
-   if( ulNotificationValue&0x01 != 0 ){
-      Serial.println("Reload MQTT Settings");
-      /* we need to reload the settings and do a reconnect */
-      if(true == mqttclient.connected() ){
-        mqttclient.disconnect();
-      }
-      Settings = eepread_mqttsettings();
-   }
-
-   if(Settings.enable != false ) {
-  
-       if(!mqttclient.connected()) {             
-            /* sainity check */
-            if( (Settings.mqttserverport!=0) && (Settings.mqttservername[0]!=0) && ( Settings.enable != false ) ){
-                  /* We try only every second to connect */
-                  Serial.print("Connecting to MQTT...");  // connect to MQTT
-                  mqttclient.setServer(Settings.mqttservername, Settings.mqttserverport); // Init MQTT     
-                  if (mqttclient.connect(Settings.mqtthostname, Settings.mqttusername, Settings.mqttpassword)) {
-                    Serial.println("connected");          // successfull connected  
-                    mqttclient.subscribe(Settings.mqtttopic);             // subscibe MQTT Topic
-                  } else {
-                    Serial.println("failed");   // MQTT not connected       
-                  }
-            }
-       } else{
-            mqttclient.loop();                            // loop on client
-            /* Check if we need to send data to the MQTT Topic, currently hardcode intervall */
-            uint32_t intervall_end = last_message +( Settings.mqtttxintervall * 1000 );
-            if( ( Settings.mqtttxintervall > 0) && ( intervall_end  <  millis() ) ){
-              last_message=millis();
-              JsonString="";
-              root.clear();
-              /* Every minute we send a new set of data to the mqtt channel */
-              JsonObject data = root.createNestedObject("data");            
-              JsonObject data_wind = data.createNestedObject("wind");
-              data_wind["direction"] = windDir*45;
-              data_wind["speed"] = windSpeed*3.6;
-              data["rain"] =  rs.getRainAmount(true) * hourMs / Settings.mqtttxintervall ;
-              data["temperature"] = temperature;
-              data["humidity"] = humidity;
-              data["airpressure"] = pressure;
-              data["PM2_5"] = PM25;
-              data["PM10"] = PM10;
-              data["Lux"] = lux_level;
-              data["UV"] = uv_level;
-              
-              JsonObject station = root.createNestedObject("station");
-              station["battery"] = batteryVoltage;
-              station["charging"] = batteryCharging;
-              serializeJson(root,JsonString);
-             
-              if ( 0 == mqttclient.publish(Settings.mqtttopic, JsonString.c_str())){
-                Serial.println("MQTT pub failed");  
-              }
-            }
-       }
-       vTaskDelay( 100/portTICK_PERIOD_MS );
-   } 
- }
+/**************************************************************************************************
+ *    Function      : _1SecondTick
+ *    Description   : Runs all fnctions inside once a second
+ *    Input         : none 
+ *    Output        : none
+ *    Remarks       : none
+ **************************************************************************************************/
+void _1SecondTick( void ){
+     timec.RTC_Tick();  
 }
 
-/***************************
- * callback - MQTT message
- ***************************/
-void callback(char* topic, byte* payload, unsigned int length) {
-
-}

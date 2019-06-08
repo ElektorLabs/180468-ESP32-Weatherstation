@@ -5,7 +5,7 @@ This is the ( experimental ) Software for the ESP32 base Elektor weatherstation 
 
 ## Getting Started
 
-Download the source and open it with the arduino ide ( >= 1.8.x ) and select Arduino Leonardo as target.
+Download the source and open it with the arduino ide ( >= 1.8.x ) and select ESP32 Pico-D4 as target.
 The station shall be detected via usb as serial port. Set the ide to use the port and compile the sketch.
 
 
