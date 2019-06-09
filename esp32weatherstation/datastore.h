@@ -19,6 +19,7 @@ typedef struct {
   char mqtttopic[501];
   char mqtthostname[65];
   uint16_t mqtttxintervall;
+  bool useIoBrokerMsgStyle;
 }mqttsettings_t; /*956 byte */
 
 typedef struct{

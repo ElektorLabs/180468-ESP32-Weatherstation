@@ -175,6 +175,16 @@ void mqttsettings_update( ){
     }
     Data.enable = value;
   }
+
+  if( ! server->hasArg("MQTT_IOBROKER") || server->arg("MQTT_IOBROKER") == NULL ) { 
+    /* we are missing something here */
+  } else { 
+    bool value = false;
+    if(server->arg("MQTT_IOBROKER")=="true"){
+      value = true;
+    }
+    Data.useIoBrokerMsgStyle = value;
+  }
   
 
   if( ! server->hasArg("MQTT_TXINTERVALL") || server->arg("MQTT_TXINTERVALL") == NULL ) { 
@@ -184,7 +194,6 @@ void mqttsettings_update( ){
     Data.mqtttxintervall = value;
   }
   /* write data to the eeprom */
-  //saveMQTTSettings(&Data);
   eepwrite_mqttsettings(Data);   
   if(MQTTTaskHandle != NULL ){
     xTaskNotify( MQTTTaskHandle, 0x01, eSetBits );
@@ -196,8 +205,7 @@ void mqttsettings_update( ){
 void read_mqttsetting(){
   String response =""; 
   mqttsettings_t Data;
-  Data = eepread_mqttsettings();
-  //loadMQTTSettings(&Data);  
+  Data = eepread_mqttsettings(); 
   DynamicJsonDocument  root(2000); 
   
  
@@ -208,6 +216,7 @@ void read_mqttsetting(){
   root["mqttuser"] = String(Data.mqttusername);
   root["mqtttopic"] = String(Data.mqtttopic);
   root["mqtttxintervall"] = Data.mqtttxintervall;
+  root["mqtte_iobrokermode"] = Data.useIoBrokerMsgStyle;
   if(Data.mqttpassword[0]!=0){
     root["mqttpass"] = "********";
   } else {

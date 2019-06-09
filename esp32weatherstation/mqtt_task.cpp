@@ -47,6 +47,7 @@ typedef enum {
   vt_i32,
   vt_flt,
   vt_dbl,
+  vt_bool,
   vt_cnt
 } valuetype_t;
 
@@ -59,6 +60,7 @@ typedef union  {
    int32_t i32;
    float flt;
    double dbl;
+   bool bl;
 } MQTT_Value_un;
 
 typedef struct{
@@ -136,10 +138,10 @@ void MQTT_Task( void* prarm ){
             uint32_t intervall_end = last_message +( Settings.mqtttxintervall * 1000 );
             if( ( Settings.mqtttxintervall > 0) && ( intervall_end  <  millis() ) ){
               last_message=millis();
-
+              if(false == Settings.useIoBrokerMsgStyle)
               {
               /* if we run in json mode we need to bulld the object */
-              
+                Serial.println("Send JSON Payload");  
                 JsonString="";
                 root.clear();
                 /* Every minute we send a new set of data to the mqtt channel */
@@ -165,20 +167,59 @@ void MQTT_Task( void* prarm ){
                     Serial.println("MQTT pub failed");  
                 }
 
-              }
-              /* If we run in IO Broker mode */
-              {
+              } else /* If we run in IO Broker mode */ {
+                Serial.println("Send for IOBroker");  
                 MQTT_Value_t Tx_Value ;
+                
+                Tx_Value.Type=vt_u16;
+                Tx_Value.Value.u16=windDir*45; 
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Direction",Tx_Value);
+                mqttclient.loop();                            // loop on client
+                
+                Tx_Value.Type=vt_u16;
+                Tx_Value.Value.u16=windSpeed*3.6; 
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Speed",Tx_Value);
+                mqttclient.loop();                            // loop on client
+                
+                Tx_Value.Type=vt_flt;
+                Tx_Value.Value.flt=rs.getRainAmount(true) * hourMs / Settings.mqtttxintervall; 
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Rain",Tx_Value);
+                mqttclient.loop();  
+                                          // loop on client
+                Tx_Value.Type=vt_flt;
+                Tx_Value.Value.flt=temperature;
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Temperature",Tx_Value);
+                mqttclient.loop();                            // loop on client
+
+                Tx_Value.Type=vt_flt;
+                Tx_Value.Value.flt=humidity;
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Humidity",Tx_Value);
+                mqttclient.loop();                            // loop on client               
+               
+                Tx_Value.Type=vt_flt;
+                Tx_Value.Value.flt=pressure;
                 SendIoBrokerSingleMSG(&Settings,"/Weather/Airpressure",Tx_Value);
+                mqttclient.loop();                            // loop on client
+
+                Tx_Value.Type=vt_u32;
+                Tx_Value.Value.u32=PM25;
                 SendIoBrokerSingleMSG(&Settings,"/Weather/PM2_5",Tx_Value);
+                mqttclient.loop();                            // loop on client
+                
+                Tx_Value.Type=vt_u32;
+                Tx_Value.Value.u32=PM10;
                 SendIoBrokerSingleMSG(&Settings,"/Weather/PM10",Tx_Value);
+                mqttclient.loop();                            // loop on client
+               
+                Tx_Value.Type=vt_flt;
+                Tx_Value.Value.flt=batteryVoltage;
                 SendIoBrokerSingleMSG(&Settings,"/Station/battery",Tx_Value);
+                mqttclient.loop();                            // loop on client
+                
+                Tx_Value.Type=vt_bool;
+                Tx_Value.Value.bl=batteryCharging;
                 SendIoBrokerSingleMSG(&Settings,"/Station/charging",Tx_Value);
+                mqttclient.loop();                            // loop on client
               }
             }
        }
@@ -234,15 +275,23 @@ void SendIoBrokerSingleMSG(mqttsettings_t* settings,const char* subtopic, const 
         error = snprintf(valuestr,sizeof(valuestr),"%lf",value.Value.dbl);
     } break;
 
+    case vt_bool:{
+      if(true != value.Value.bl){
+          strncpy (valuestr,"false", sizeof(valuestr));
+      } else {
+          strncpy (valuestr,"true",sizeof(valuestr));
+      }
+    }break;
+
     default:{
-        error = -1;
+        error = -66;
     } break;
 
   }
   
   if( (error < 0)  || ( error > sizeof(valuestr ) ) ) {
     /* value is truncated ! */
-    Serial.println("value string error");  
+    Serial.printf("value string error: %i\n\r",error );  
   } else {
     strncpy(mqttcombinedtopic, settings->mqtttopic, 1023);
     /* This is 'save' as if we have a size of zero the compile will / shall fail */
@@ -253,7 +302,10 @@ void SendIoBrokerSingleMSG(mqttsettings_t* settings,const char* subtopic, const 
     if ( 0 == mqttclient.publish(mqttcombinedtopic,valuestr, true) ){ 
         Serial.println("MQTT pub failed");  
     } else {
-         Serial.printf("Published in %s the Message:%s", mqttcombinedtopic, value);
+         Serial.print("Published in "); 
+         Serial.print(mqttcombinedtopic);
+         Serial.print(" the Message:");
+         Serial.println( valuestr );
     }
   }
 }
