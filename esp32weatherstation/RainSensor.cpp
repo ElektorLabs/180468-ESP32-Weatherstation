@@ -1,7 +1,7 @@
 #include "RainSensor.h"
 
 RainSensor::RainSensor(int _pin) {
-  pin = pin;
+  pin = _pin;
 }
 
 void RainSensor::initRainSensor() {
