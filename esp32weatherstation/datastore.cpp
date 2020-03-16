@@ -10,9 +10,12 @@ bool eepread_struct( void* element, uint32_t e_size, uint32_t startaddr  );
 /* This will be the layout used by the data within the flash */
 #define CREDENTIALS_START 0
 /* credentials are 256+4Byte */
+#define TIMECORECONFIG_START 280
+/* config is 24 byte + 4 byte */
+#define NTP_START 320
+/* config is 137+4 byte */
 #define NOTES_START 500
 /* notes take 512 byte */
-
 #define MQTT_START 2048
 /* this takes 1024byte */
 /**************************************************************************************************
@@ -130,6 +133,63 @@ void eepwrite_struct(void* data_in, uint32_t e_size, uint32_t address ){
   } 
   EEPROM.commit();
   
+}
+
+/**************************************************************************************************
+ *    Function      : write_ntp_config
+ *    Description   : writes the ntp config
+ *    Input         : ntp_config_t c 
+ *    Output        : none
+ *    Remarks       : none 
+ **************************************************************************************************/
+void write_ntp_config(ntp_config_t c){
+   eepwrite_struct( ( (void*)(&c) ), sizeof(ntp_config_t) , NTP_START );    
+}
+
+/**************************************************************************************************
+ *    Function      : read_ntp_config
+ *    Description   : writes the ntp config
+ *    Input         : none
+ *    Output        : ntp_config_t
+ *    Remarks       : none
+ **************************************************************************************************/
+ntp_config_t read_ntp_config( void ){
+  ntp_config_t retval;
+  if(false ==  eepread_struct( (void*)(&retval), sizeof(ntp_config_t) , NTP_START ) ){
+    Serial.println("NTP CONF");
+    bzero((void*)&retval,sizeof( ntp_config_t ));
+    write_ntp_config(retval);
+  } 
+  return retval;
+}
+
+/**************************************************************************************************
+ *    Function      : write_timecoreconf
+ *    Description   : writes the time core config
+ *    Input         : timecoreconf_t
+ *    Output        : none
+ *    Remarks       : none
+ **************************************************************************************************/
+void write_timecoreconf(timecoreconf_t c){
+  eepwrite_struct( ( (void*)(&c) ), sizeof(timecoreconf_t) , TIMECORECONFIG_START );  
+}
+
+
+/**************************************************************************************************
+ *    Function      : read_timecoreconf
+ *    Description   : reads the time core config
+ *    Input         : none
+ *    Output        : timecoreconf_t
+ *    Remarks       : none
+ **************************************************************************************************/
+timecoreconf_t read_timecoreconf( void ){
+  timecoreconf_t retval;
+  if(false == eepread_struct( (void*)(&retval), sizeof(timecoreconf_t) , TIMECORECONFIG_START ) ){ 
+    Serial.println("TIME CONF");
+    retval = Timecore::GetDefaultConfig();
+    write_timecoreconf(retval);
+  }
+  return retval;
 }
 
 

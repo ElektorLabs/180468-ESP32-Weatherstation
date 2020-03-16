@@ -261,7 +261,8 @@
                             <fieldset>
                                         <legend>MQTT settings</legend>
                                         <input type="checkbox" id="MQTT_ENA" name="MQTT_ENA" value="MQTT_ENA">Enable MQTT Client<br><br>
-                                        <input style="width:60px" type="number" id="MQTT_UPDATE_INT" name="MQTT_UPDATE_INT" min="0" max="65535" value="10"> Intervall<br><br>
+                                        <input type="checkbox" id="MQTT_IOBROKER" name="MQTT_IOBROKER" value="MQTT_IOBROKER">ioBroker compatibility<br><br>
+                                        <input style="width:60px" type="number" id="MQTT_UPDATE_INT" name="MQTT_UPDATE_INT" min="0" max="65535" value="10"> Interval (Seconds)<br><br>
                                         MQTT Hostname <input type="text" id="MQTT_HOST" name="MQTT_HOST" value=""> <br><br> 
                                         MQTT Server <input type="text" id="MQTT_SERVER" name="MQTT_SERVER" value="0.0.0.0"> 
                                         <input style="width:60px" type="number" id="MQTT_PORT" name="ntp_update_delta" min="0" max="65535" value="1833"> Port <br><br>
@@ -279,34 +280,7 @@
                     </table>
             
             </div>
- <!--           
-             <div id="HttpView" class="views grid">
-                 <table>
-						<thead>
-							<tr>
-								<th colspan="2">Webserver Settings</th>
-							</tr>
-						</thead>
-                        
-						<tbody>
-							<tr>
-                            <td>
-                            <fieldset>
-                                        <legend>Webserver settings</legend>
-                                        Username <input type="text" id="HTTP_USER" name="HTTP_USER" value=""><br>
-                                        Password <input type="password" id="HTTP_PASS" name="HTTP_PASS" value=""><br><br>
-                                        <button type="button" onclick="SubmitHTTP(); return false;">Submit</button>
-                            </fieldset>
-                            <fieldset>
-                            Username and password is used for <br>
-                            login at the Webinterface
-                            </fieldset>
-                            </td>
-                        </tr>
-                    </table>
-            
-            </div>
--->			
+ 		
             <div id="Notes" class="views grid">
          
                      
@@ -849,6 +823,7 @@
             document.getElementById("MQTT_PASS").type = "password";
             document.getElementById("MQTT_ENA").checked = jsonObj.mqttena;
             document.getElementById("MQTT_UPDATE_INT").value = jsonObj.mqtttxintervall;
+            document.getElementById("MQTT_IOBROKER").checked = jsonObj.mqtte_iobrokermode;
              
             
         }
@@ -868,12 +843,16 @@
             var mqtt_topic =  document.getElementById("MQTT_TOPIC").value;
             var mqtt_ena = document.getElementById("MQTT_ENA").checked;
             var mqtt_txintervall =  document.getElementById("MQTT_UPDATE_INT").value;
+            var mqtt_iobrokermode = document.getElementById("MQTT_IOBROKER").checked;
             
             
             var data = [];
             data.push({key:"MQTT_ENA",
                            value: mqtt_ena}); 
-            
+           
+           data.push({key:"MQTT_IOBROKER",
+                           value: mqtt_iobrokermode}); 
+                           
             data.push({key:"MQTT_PORT",
                            value: mqtt_port});
            

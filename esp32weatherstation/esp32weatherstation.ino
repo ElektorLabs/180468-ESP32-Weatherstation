@@ -1,3 +1,7 @@
+
+
+
+
 /******************************************************************************************
  * 
  * Elektor ESP32 based Weaterstation 
@@ -14,6 +18,7 @@
  * 
  *********************************************************************************************/
 
+
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
@@ -21,15 +26,21 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <Preferences.h>
+/* I2C Sensors */
+#include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include <Adafruit_VEML6070.h>
+#include <Adafruit_TSL2561_U.h>
+
 #include <Wire.h>
 #include <SDS011.h>
 #include "Honnywell.h"
 #include "WindSensor.h"
 #include "RainSensor.h"
 #include "datastore.h"
-#include <ArduinoJson.h>
-#include <PubSubClient.h>
+#include "mqtt_task.h"
+#include "NTP_Client.h"
+#include "timecore.h"
 
 #define solarRelay 18
 #define measBatt 34
@@ -101,6 +112,11 @@ float humidity = 0; //%
 float pressure = 0; //hPa
 bool bmeRead = 0;
 
+int16_t uv_level = 0;
+
+float lux_level = 0;
+bool has_TSL2561 = true;
+
 float PM10 = 0; //particle size: 10 um or less
 float PM25 = 0; //particle size: 2.5 um or less
 
@@ -117,21 +133,27 @@ unsigned long lastUploadTime = 0;
 unsigned long lastAPConnection = 0;
 unsigned long lastBattMeasurement = 0;
 
+
+
+
+
 WindSensor ws(windSpeedPin, windDirPin);
 RainSensor rs(rainPin);
 Adafruit_BME280 bme;
+Adafruit_VEML6070 uv = Adafruit_VEML6070();
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
 
 #define USE_SDS011
-//#define USE_HonnywellHPM
+//#define USE_HONNYWELLHPM
 
 #ifdef USE_SDS011
 /* If SDS011 is connected */
 SDS011 sds(Serial1);
 #endif
 
-#ifdef USE_HonnywellHPM
-/* If Honnywell sensor is connected */
+#ifdef USE_HONNYWELLHPM
+/* If Honnywhell sensor is connected */
 /* Warning Code is untested and not supported */
 HonnywellHPM hpm(Serial1);
 #endif
@@ -141,27 +163,28 @@ WebServer* server = NULL;
 WiFiClient* client = NULL;
 WiFiClientSecure* clientS = NULL;
 
-WiFiClient espClient;                       // WiFi ESP Client  
-PubSubClient mqttclient(espClient);             // MQTT Client 
+
 
 Preferences pref;
 
-TaskHandle_t MQTTTaskHandle = NULL;
+Timecore timec;
+NTP_Client NTPC;
 
-void Setup_MQTT_Task( void ){
+Ticker TimeKeeper;
 
-   xTaskCreatePinnedToCore(
-   MQTT_Task,
-   "MQTT_Task",
-   10000,
-   NULL,
-   1,
-   &MQTTTaskHandle,
-   1);
-
-}
+void _1SecondTick( void );
 
 void setup() {
+  //first we enable the dynamic frequency scaling to reduce power consumption
+  /*
+  esp_pm_config_esp32_t dynamicsettings;
+  dynamicsettings.maxfreq_mhz = ESP32_DEFAULT_CPU_FREQ_80;
+  dynamicsettings.min_freq_mhz = 10000000; 
+  dynamicsettings.light_sleep_enable = false;
+  if(ESP_OK  != esp_pm_configure(&dynamicsettings){
+    
+  }
+  */
   // put your setup code here, to run once:
   Serial.begin(115200);
   Serial1.begin(9600);
@@ -188,6 +211,14 @@ void setup() {
   ws.initWindSensor();
   rs.initRainSensor();
   
+  /* We read the Config from flash */
+  Serial.println(F("Read Timecore Config"));
+  timecoreconf_t cfg = read_timecoreconf();
+  timec.SetConfig(cfg);
+  /* Now we start with the config for the Timekeeping and sync */
+  TimeKeeper.attach_ms(1000, _1SecondTick);
+  
+
   Wire.begin(25, 26, 100000); //sda, scl, freq=100kHz
   if(false == bme.begin(bmeAddress)){
         hasBME280 = false;
@@ -200,15 +231,35 @@ void setup() {
                     Adafruit_BME280::SAMPLING_X1, // humidity
                     Adafruit_BME280::FILTER_OFF);
   }
+    if(!tsl.begin())
+  {
+    /* There was a problem detecting the TSL2561 ... check your connections */
+    Serial.println("No TSL2561 detected, searched on ADDR:0x39, ( addr pin floating )");
+    has_TSL2561 = false;
+  } else {
+     tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+     /* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
+     //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
+     // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+     tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
+     has_TSL2561 = true;
+  }
+
+  uv.begin(VEML6070_1_T);  // pass in the integration time constant
+  
 
   #ifdef USE_SDS011 
     sds.setMode(SDS_SET_QUERY);
+    Serial.println("Using SDS011");
   #endif
 
-  #ifdef USE_HonnywellHPM
+  #ifdef USE_HONNYWHELLHPM
+    Serial.println("Using Honnywell HPM");
     hpm.begin();
   #endif
-  Setup_MQTT_Task();
+  MQTTTaskStart();
+
+
  
   
 }
@@ -241,10 +292,12 @@ void loop() {
   readWindSensor();
   readRainSensor();
 
-  //read bme280 every 5 seconds
+  //read bme280 every 5 seconds, also UV and Light
   if ((lastBMETime + bmeInterval) < millis()) {
     lastBMETime = millis();
     readBME();
+    readUV();
+    readLux();
   }
 
   //read SDS011 every minute
@@ -256,7 +309,7 @@ void loop() {
   }
   #endif
 
-  #ifdef HonnywellHPM
+  #ifdef HONNYWELLHPM
     hpm.ProcessData();
     if ((lastSDSTime + sdsInterval) < millis()) {
       lastSDSTime = millis();
@@ -346,89 +399,37 @@ void readBME() {
   }
 }
 
-void MQTT_Task( void* prarm ){
+void readUV( void ){
+  uint16_t level = uv.readUV();
+  uv_level = level; // library can return -1 in case of an error but it is casted to uint16_t ........
+}
+
+void readLux( void ){
+  if(has_TSL2561==false){
+   lux_level=0;
+  } else {
+  sensors_event_t event;
+    tsl.getEvent(&event);
    
-   DynamicJsonDocument  root(300);
-   String JsonString = "";
-   uint32_t ulNotificationValue;
-   int32_t last_message = millis();
-   mqttsettings_t Settings = eepread_mqttsettings();
-                         
-   Serial.println("MQTT Thread Start");
-   mqttclient.setCallback(callback);             // define Callback function
-   while(1==1){
-
-   /* if settings have changed we need to inform this task that a reload and reconnect is requiered */ 
-   if(Settings.enable != false){
-    ulNotificationValue = ulTaskNotifyTake( pdTRUE, 0 );
-   } else {
-    Serial.println("MQTT disabled, going to sleep");
-    if(true == mqttclient.connected() ){
-        mqttclient.disconnect();
+    /* Display the results (light is measured in lux) */
+    if (event.light)
+    {
+      //Serial.print(event.light); Serial.println(" lux");
+      lux_level = event.light;
+      
     }
-    ulNotificationValue = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-    Serial.println("MQTT awake from sleep");
-   }
+  }
+}
+ 
 
-   if( ulNotificationValue&0x01 != 0 ){
-      Serial.println("Reload MQTT Settings");
-      /* we need to reload the settings and do a reconnect */
-      if(true == mqttclient.connected() ){
-        mqttclient.disconnect();
-      }
-      Settings = eepread_mqttsettings();
-   }
-
-   if(Settings.enable != false ) {
-  
-       if(!mqttclient.connected()) {             
-            /* sainity check */
-            if( (Settings.mqttserverport!=0) && (Settings.mqttservername[0]!=0) && ( Settings.enable != false ) ){
-                  /* We try only every second to connect */
-                  Serial.print("Connecting to MQTT...");  // connect to MQTT
-                  mqttclient.setServer(Settings.mqttservername, Settings.mqttserverport); // Init MQTT     
-                  if (mqttclient.connect(Settings.mqtthostname, Settings.mqttusername, Settings.mqttpassword)) {
-                    Serial.println("connected");          // successfull connected  
-                    mqttclient.subscribe(Settings.mqtttopic);             // subscibe MQTT Topic
-                  } else {
-                    Serial.println("failed");   // MQTT not connected       
-                  }
-            }
-       } else{
-            mqttclient.loop();                            // loop on client
-            /* Check if we need to send data to the MQTT Topic, currently hardcode intervall */
-            uint32_t intervall_end = last_message +( Settings.mqtttxintervall * 60000 );
-            if( ( Settings.mqtttxintervall > 0) && ( intervall_end  <  millis() ) ){
-              last_message=millis();
-              JsonString="";
-              /* Every minute we send a new set of data to the mqtt channel */
-              JsonObject data = root.createNestedObject("data");            
-              JsonObject data_wind = data.createNestedObject("wind");
-              data_wind["direction"] = windDirAvg;
-              data_wind["speed"] = windSpeedAvg;
-              data["rain"] = rainAmountAvg;
-              data["temperature"] = temperature;
-              data["humidity"] = humidity;
-              data["airpressure"] = pressure;
-              data["PM2_5"] = PM25;
-              data["PM10"] = PM10;
-              
-              JsonObject station = root.createNestedObject("station");
-              station["battery"] = batteryVoltage;
-              station["charging"] = batteryCharging;
-              serializeJson(root,JsonString);
-              Serial.println(JsonString);
-              mqttclient.publish(Settings.mqtttopic, JsonString.c_str(), true); 
-            }
-       }
-       vTaskDelay( 100/portTICK_PERIOD_MS );
-   } 
- }
+/**************************************************************************************************
+ *    Function      : _1SecondTick
+ *    Description   : Runs all fnctions inside once a second
+ *    Input         : none 
+ *    Output        : none
+ *    Remarks       : none
+ **************************************************************************************************/
+void _1SecondTick( void ){
+     timec.RTC_Tick();  
 }
 
-/***************************
- * callback - MQTT message
- ***************************/
-void callback(char* topic, byte* payload, unsigned int length) {
-
-}

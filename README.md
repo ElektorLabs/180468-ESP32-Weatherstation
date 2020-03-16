@@ -1,11 +1,11 @@
 #  180468 - ESP32 Weatherstation
 
-This is the Software for the ESP32 base Elektor weatherstation ( 180468 )
+This is the ( experimental ) Software for the ESP32 base Elektor weatherstation ( 180468 )
 
 
 ## Getting Started
 
-Download the source and open it with the arduino ide ( >= 1.8.x ) and select Arduino Leonardo as target.
+Download the source and open it with the arduino ide ( >= 1.8.x ) and select ESP32 Pico-D4 as target.
 The station shall be detected via usb as serial port. Set the ide to use the port and compile the sketch.
 
 
@@ -16,6 +16,8 @@ The station shall be detected via usb as serial port. Set the ide to use the por
  
 ##### From Library Manager
  * Adafruit BME280 Library 1.0.7 by Adafruit
+ * Adafruit VEML6070 Library 
+ * Adafruit TSL2561 Library
  * Adafruit Unified Sensor 1.0.2 by Adafruit
  * ArduinoJson 6.x.x by Benoit Blanchon
  * PubSubClient by Nick O'Leary 
