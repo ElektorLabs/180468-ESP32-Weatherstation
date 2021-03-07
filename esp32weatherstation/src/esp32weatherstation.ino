@@ -1,7 +1,3 @@
-
-
-
-
 /******************************************************************************************
  * 
  * Elektor ESP32 based Weaterstation 
@@ -15,6 +11,16 @@
  * ArduinoJson 6.x.x by Benoit Blanchon
  * PubSubClient by Nick O'Leary 
  * CRC32 by Christopher Baker
+ * Adafruit VEML6070 Library
+ * Adafruit TSL2561
+ * 
+ * Those will be installed by Plattform.io on demand.
+ * 
+ * If you encounter build errors regardng time.h or incompleate struc tm or ctime
+ * have a look at https://community.platformio.org/t/build-error-if-time-library-is-installed/450
+ * delete .pio/libdeps/pico32/Time/time.h and it shall work again
+ * 
+ * Moved from Arduino IDE to Platform.IO 05/03/2021
  * 
  *********************************************************************************************/
 
@@ -33,7 +39,7 @@
 #include <Adafruit_TSL2561_U.h>
 
 #include <Wire.h>
-#include <SDS011.h>
+#include "../lib/SDS011/SDS011.h"
 #include "Honnywell.h"
 #include "WindSensor.h"
 #include "RainSensor.h"

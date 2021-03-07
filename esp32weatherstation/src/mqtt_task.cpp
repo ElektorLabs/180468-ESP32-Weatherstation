@@ -248,23 +248,23 @@ void SendIoBrokerSingleMSG(mqttsettings_t* settings,const char* subtopic, const 
       } break;
 
       case vt_i8:{
-        error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.u8);
+        error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.i8);
       } break;
 
       case vt_u16:{
-      error = snprintf(valuestr,sizeof(valuestr),"%u",value.Value.u8);
+      error = snprintf(valuestr,sizeof(valuestr),"%u",value.Value.u16);
       } break;
 
     case vt_i16:{
-      error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.u8);
+      error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.i16);
       } break;
 
     case vt_u32:{
-      error = snprintf(valuestr,sizeof(valuestr),"%u",value.Value.u8);
+      error = snprintf(valuestr,sizeof(valuestr),"%u",value.Value.u32);
       } break;
 
     case vt_i32:{
-        error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.dbl);
+        error = snprintf(valuestr,sizeof(valuestr),"%i",value.Value.i32);
       } break;
 
     case vt_flt:{

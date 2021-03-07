@@ -11,6 +11,7 @@
  
 #include "Arduino.h"
 #include <TimeLib.h>
+#include "time.h"
 #include "timezone_enums.h"
 
 
