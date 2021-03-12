@@ -34,7 +34,7 @@ NTP.setInterval (50);
  *    Remarks       : Event after a NTP Sync
  **************************************************************************************************/
 void NTP_Client::SyncEvent(NTPSyncEvent_t event){
-          switch(event){
+        switch(event){
           case noResponse:{
                Serial.println(F("NTP No Response"));
           }
@@ -57,7 +57,11 @@ void NTP_Client::SyncEvent(NTPSyncEvent_t event){
           Serial.println(F("NTP invalid Address"));
         } break;
 
-        }
+        default:{
+          //everything else goes here
+        }break;
+
+      }
  
      
 }

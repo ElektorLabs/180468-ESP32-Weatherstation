@@ -108,7 +108,7 @@ void MQTT_Task( void* prarm ){
     Serial.println("MQTT awake from sleep");
    }
 
-   if( ulNotificationValue&0x01 != 0 ){
+   if( (ulNotificationValue&0x01) != 0 ){
       Serial.println("Reload MQTT Settings");
       /* we need to reload the settings and do a reconnect */
       if(true == mqttclient.connected() ){
