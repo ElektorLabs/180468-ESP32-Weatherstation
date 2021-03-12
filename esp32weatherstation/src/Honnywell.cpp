@@ -33,7 +33,7 @@ void HonnywellHPM::hpmDecode(byte x)
   static unsigned int hpmPM10Buffer[20];
   static int posbuffer = 0;
   static byte lastx;
-  static unsigned long tmupdate;
+  //static unsigned long tmupdate;
   unsigned int checksum = 0;
   
   hpmBuffer[posbuffer] = x;
