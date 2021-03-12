@@ -308,6 +308,7 @@ void configureClient() {
   client = new WiFiClient();
   clientS = new WiFiClientSecure();
   clientS->setCACert(certificate);
+  clientS->setCACert(root_ca);
 }
 
 //request the specified url of the specified host
