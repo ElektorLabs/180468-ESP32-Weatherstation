@@ -319,32 +319,42 @@ void loop() {
    
   #endif
   
+  if(uploadInterval< 60*1000 ){
+        uploadInterval = 60 *1000;    
+  }
+
   //upload data if the uploadperiod has passed and if WiFi is connected
   if (((lastUploadTime + uploadInterval) < millis()) && (WiFi.status() == WL_CONNECTED)) {
+    
     lastUploadTime = millis();
     Serial.println("Upload interval time passed");
-    
-    windSpeedAvg = ws.getWindSpeedAvg();
-    windDirAvg = ws.getWindDirAvg();
-    rainAmountAvg = rs.getRainAmount() * hourMs / uploadInterval;
-  
-    if (thingspeakEnabled) {
-      if (uploadToThingspeak())
-        Serial.println("Uploaded successfully");
-      else
-        Serial.println("Uploading failed");
-    }
-    else
-      Serial.println("Thingspeak disabled");
+    if( (true ==thingspeakEnabled) || ( true == senseBoxEnabled) ) {
 
-    if (senseBoxEnabled) {
-      if (uploadToSenseBox())
-        Serial.println("Uploaded successfully");
-      else
-        Serial.println("Uploading failed");
-    }
-    else
-      Serial.println("SenseBox disabled");
+        /* For Thingspeak and SneseBox we are using idx 0  */
+        windSpeedAvg = ws.getWindSpeedAvg();
+        windDirAvg = ws.getWindDirAvg();
+        rainAmountAvg = rs.getRainAmount(0) * hourMs / uploadInterval;
+      
+        if (thingspeakEnabled) {
+          if (uploadToThingspeak())
+            Serial.println("Uploaded successfully");
+          else
+            Serial.println("Uploading failed");
+        }
+        else
+          Serial.println("Thingspeak disabled");
+
+        if (senseBoxEnabled) {
+          if (uploadToSenseBox())
+            Serial.println("Uploaded successfully");
+          else
+            Serial.println("Uploading failed");
+        }
+        else
+          Serial.println("SenseBox disabled");
+        }
+  } else {
+    Serial.println("SenseBox  and Thingspeak disabled");
   }
 
   //handle battery (resistor divider: vBatt|--[470k]-+-[100k]--|gnd)
@@ -432,4 +442,3 @@ void readLux( void ){
 void _1SecondTick( void ){
      timec.RTC_Tick();  
 }
-

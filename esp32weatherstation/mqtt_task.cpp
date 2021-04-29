@@ -149,7 +149,9 @@ void MQTT_Task( void* prarm ){
                 JsonObject data_wind = data.createNestedObject("wind");
                 data_wind["direction"] = windDir*45;
                 data_wind["speed"] = windSpeed*3.6;
-                data["rain"] =  rs.getRainAmount(true) * hourMs / Settings.mqtttxintervall ;
+                float rainamount = rs.getRainAmount(1,true) * hourMs / Settings.mqtttxintervall ;
+                rainAmountAvg = rainamount;
+                data["rain"] = rainamount;
                 data["temperature"] = temperature;
                 data["humidity"] = humidity;
                 data["airpressure"] = pressure;

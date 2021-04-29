@@ -7,15 +7,20 @@ class RainSensor {
   private:
     int pin;
     
-    float rainAmount = 0; //in mm
-    uint32_t lastClear=0;
+    typedef struct{
+      float rainAmount; //in mm
+      uint32_t lastClear;
+    } raindata_t;
+
+  raindata_t Datasets[3];
+
   public:
     RainSensor(int _pin);
     void initRainSensor();
-    void clearRainAmount();
     void calcRainAmount();
-    float getRainAmount(bool clearVars = true);
-    float getRainCurrentAmount( void );
+    void clearRainAmount(uint32_t idx);
+    float getRainAmount(uint32_t idx,bool clearVars = true);
+    //float getRainCurrentAmount( void );
 };
 
 #endif
